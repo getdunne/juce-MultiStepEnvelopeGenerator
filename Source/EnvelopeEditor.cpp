@@ -209,6 +209,12 @@ void EnvelopeEditor::mouseDown(const MouseEvent& evt)
     }
 }
 
+#define MIN_CURVATURE -2.0f
+#define MAX_CURVATURE 2.0f
+
+//#define MIN_CURVATURE -50.0f
+//#define MAX_CURVATURE 50.0f
+
 void EnvelopeEditor::mouseDrag(const MouseEvent& evt)
 {
     int mx = evt.getPosition().getX();
@@ -241,8 +247,8 @@ void EnvelopeEditor::mouseDrag(const MouseEvent& evt)
             dy = 0.02f * evt.getDistanceFromDragStartY();
             if (envDesc[segmentIndex].finalValue < envDesc[segmentIndex].initialValue) dy = -dy;
             curvature = savedCurvature - dy * dy*dy;
-            if (curvature > 50.0f) curvature = 50.0f;
-            if (curvature < -50.0f) curvature = -50.0f;
+            if (curvature > MAX_CURVATURE) curvature = MAX_CURVATURE;
+            if (curvature < MIN_CURVATURE) curvature = MIN_CURVATURE;
             envDesc[segmentIndex].curvature = curvature;
             break;
         default:

@@ -8,7 +8,8 @@ void SegmentGenerator::reset(float initialValue, float finalValue, float curvatu
     segLength = segmentLengthSamples;
 
     isLinear = (curvature == 0.0f);
-    if (!isLinear) table.exponentialRise(-curvature, curvature);
+    //if (!isLinear) table.exponential(-curvature, curvature);
+    if (!isLinear) table.powerCurve(powf(2.0f, -curvature));
 
     start();
 }
