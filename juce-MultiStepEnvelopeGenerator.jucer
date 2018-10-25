@@ -1,15 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT id="B3s6xd" name="juce-MultiStepEnvelopeGenerator" projectType="guiapp"
-              jucerVersion="5.3.2" headerPath="../../../AudioKit/AudioKit/Core/AudioKitCore/Common">
+              jucerVersion="5.3.2">
   <MAINGROUP id="sODy9K" name="juce-MultiStepEnvelopeGenerator">
-    <GROUP id="{09FD4809-3D04-97DB-3961-80877055F41C}" name="AudioKit Core">
-      <FILE id="UvZYdQ" name="FunctionTable.cpp" compile="1" resource="0"
-            file="../AudioKit/AudioKit/Core/AudioKitCore/Common/FunctionTable.cpp"/>
-      <FILE id="ibI8mT" name="FunctionTable.hpp" compile="0" resource="0"
-            file="../AudioKit/AudioKit/Core/AudioKitCore/Common/FunctionTable.hpp"/>
-    </GROUP>
     <GROUP id="{F8A6C4CC-8239-9B6D-A5D2-83C666CD1A01}" name="Source">
+      <FILE id="vBNbha" name="FunctionTable.cpp" compile="1" resource="0"
+            file="Source/FunctionTable.cpp"/>
+      <FILE id="DGtYiu" name="FunctionTable.h" compile="0" resource="0" file="Source/FunctionTable.h"/>
       <FILE id="aaADyl" name="EnvelopeEditor.cpp" compile="1" resource="0"
             file="Source/EnvelopeEditor.cpp"/>
       <FILE id="LvnarM" name="EnvelopeEditor.h" compile="0" resource="0"

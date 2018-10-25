@@ -1,6 +1,6 @@
 #pragma once
 #include "JuceHeader.h"
-#include "FunctionTable.hpp"
+#include "FunctionTable.h"
 
 class SegmentGenerator
 {
@@ -36,7 +36,7 @@ protected:
     int tcount, segLength;
     double x, dx;
 
-    AudioKitCore::FunctionTable table;
+    FunctionTable table;
 };
 
 class MultiSegmentEnvelopeGenerator : public SegmentGenerator
