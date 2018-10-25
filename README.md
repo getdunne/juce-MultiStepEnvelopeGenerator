@@ -1,4 +1,6 @@
 # juce-MultiStepEnvelopeGenerator
+![](juce-env.png)
+
 This is an example of how to create and edit multi-segment envelope curves similar to those provided by popular music synthesizer plug-ins such as [Omnisphere 2](https://www.spectrasonics.net/products/omnisphere/), [Serum](https://www.xferrecords.com/products/serum), etc.
 
 Curve segments are based on code by the author used in [AudioKit](https://github.com/AudioKit). The shape of each envelope segment is defined by a small look-up table (class *FunctionTable*), allowing enormous flexibility in the actual curve shapes.
