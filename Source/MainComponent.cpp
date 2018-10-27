@@ -8,10 +8,5 @@ MainComponent::MainComponent()
 
 void MainComponent::resized()
 {
-    envEd.setBounds(getLocalBounds().reduced(10));
-}
-
-void MainComponent::paint (Graphics& g)
-{
-    g.fillAll(Colours::lightgrey);
+    envEd.setBounds(getLocalBounds());
 }

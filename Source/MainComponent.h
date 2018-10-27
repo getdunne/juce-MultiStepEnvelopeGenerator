@@ -9,7 +9,6 @@ public:
     MainComponent();
 
     void resized() override;
-    void paint(Graphics&) override;
 
 protected:
     EnvelopeEditor envEd;

@@ -1,4 +1,5 @@
 #include "EnvelopeEditor.h"
+#include "Settings.h"
 
 EnvelopeEditor::EnvelopeEditor()
 {
@@ -12,28 +13,35 @@ EnvelopeEditor::~EnvelopeEditor()
 
 void EnvelopeEditor::paintGraph(Graphics& g)
 {
+    auto bounds = getLocalBounds().reduced(INSET_PIXELS);
+    const float x0 = float(INSET_PIXELS);
+    const float y0 = float(INSET_PIXELS);
+    int height = bounds.getHeight();
+    int width = bounds.getWidth();
+
     // paint the graph
+    g.setColour(Colours::white);
     Path p;
     float fx, fy;
     bool endOfEnvelope = env.getSample(fy);
-    p.startNewSubPath(0.0f, (1.0f - fy) * getHeight());
-    for (int ix = 1; !endOfEnvelope && ix < getWidth(); ix++)
+    p.startNewSubPath(x0 + 0.0f, y0 + (1.0f - fy) * height);
+    for (int ix = 1; !endOfEnvelope && ix < width; ix++)
     {
         endOfEnvelope = env.getSample(fy);
         fx = float(ix);
-        p.lineTo(fx, (1.0f - fy) * getHeight());
+        p.lineTo(x0 + fx, y0 + (1.0f - fy) * height);
     }
     g.strokePath(p, PathStrokeType(2.0f));
 
     // put a circle at every segment start point
-    Rectangle<float> dotRect(10.0f, 10.0f);
+    Rectangle<float> dotRect(2 * DOT_RADIUS, 2 * DOT_RADIUS);
     int segStart = 0;
     int segEnd = 0;
     int si = 0;
     for ( ; si < envDesc.size(); si++)
     {
-        fx = float(segStart);
-        fy = (1.0f - envDesc[si].initialValue) * getHeight();
+        fx = x0 + float(segStart);
+        fy = y0 + (1.0f - envDesc[si].initialValue) * height;
         g.setColour(backgroundColour);
         g.fillEllipse(dotRect.withCentre(Point<float>(fx, fy)));
         g.setColour(Colours::white);
@@ -45,8 +53,8 @@ void EnvelopeEditor::paintGraph(Graphics& g)
     }
 
     // put a circle at the last segment end point
-    fx = float(segEnd);
-    fy = (1.0f - envDesc[si-1].finalValue) * getHeight();
+    fx = x0 + float(segEnd);
+    fy = y0 + (1.0f - envDesc[si-1].finalValue) * bounds.getHeight();
     g.setColour(backgroundColour);
     g.fillEllipse(dotRect.withCentre(Point<float>(fx, fy)));
     g.setColour(Colours::white);
@@ -57,7 +65,6 @@ void EnvelopeEditor::paint (Graphics& g)
 {
     g.fillAll(backgroundColour);
     env.reset(&envDesc);
-    g.setColour(Colours::white);
     paintGraph(g);
 }
 
@@ -66,10 +73,12 @@ void EnvelopeEditor::resized()
     if (envDesc.size() == 0) return;
 
     // resize all segments proportionally
+    auto bounds = getLocalBounds().reduced(INSET_PIXELS);
+
     int oldWidth = 0;
     for (auto& seg : envDesc) oldWidth += seg.lengthSamples;
 
-    int newWidth = getWidth();
+    int newWidth = bounds.getWidth();
     int totalWidth = 0;
     for (int i=0; i < (int(envDesc.size()) - 1); i++)
     {
@@ -96,19 +105,25 @@ int EnvelopeEditor::getSegmentIndexFor(int sampleIndex)
 
 int EnvelopeEditor::getControlPointIndexFor(int mx, int my, int allowance)
 {
+    auto bounds = getLocalBounds().reduced(INSET_PIXELS);
+    mx -= INSET_PIXELS;
+    my -= INSET_PIXELS;
+
     int segStart = 0;
     for (int i = 0; i < envDesc.size(); i++)
     {
         int segLength = envDesc[i].lengthSamples;
         int segEnd = segStart + segLength;
-        if (mx > segStart && (mx - segStart) < allowance)
+        //if ((mx < 0 || mx >= segStart) && (mx - segStart) < allowance)
+        if (abs(mx - segStart) < allowance)
         {
-            if (abs(my - (1.0f - envDesc[i].initialValue) * getHeight()) < allowance)
+            if (abs(my - (1.0f - envDesc[i].initialValue) * bounds.getHeight()) < allowance)
                 return i;
         }
-        if (mx <= segEnd && (segEnd - mx) < allowance)
+        //if ((segEnd - mx) < allowance)
+        if (abs(mx - segEnd) < allowance)
         {
-            if (abs(my - (1.0f - envDesc[i].finalValue) * getHeight()) < allowance)
+            if (abs(my - (1.0f - envDesc[i].finalValue) * bounds.getHeight()) < allowance)
                 return i + 1;
         }
         segStart += segLength;
@@ -133,9 +148,10 @@ void EnvelopeEditor::getSegmentStartAndEndIndices(int segIndex, int &segStart, i
 
 void EnvelopeEditor::mouseDown(const MouseEvent& evt)
 {
+    auto bounds = getLocalBounds().reduced(INSET_PIXELS);
     int mx = evt.getPosition().getX();
     int my = evt.getPosition().getY();
-    float fy = 1.0f - my / float(getHeight());
+    float fy = 1.0f - (my - INSET_PIXELS) / float(bounds.getHeight());
     actionType = none;
 
     segmentIndex = getControlPointIndexFor(mx, my);
@@ -180,14 +196,14 @@ void EnvelopeEditor::mouseDown(const MouseEvent& evt)
         if (evt.getNumberOfClicks() > 1)
         {
             // insert new control point
-            segmentIndex = getSegmentIndexFor(mx);
+            segmentIndex = getSegmentIndexFor(mx - INSET_PIXELS);
             auto it = envDesc.begin();
             for (int i = 0; i < segmentIndex; i++) it++;
 
             auto seg = *it;
             int segStart, segEnd, prevSegStart;
             getSegmentStartAndEndIndices(segmentIndex, segStart, segEnd, prevSegStart);
-            int lengthDelta = mx - segStart;
+            int lengthDelta = mx - INSET_PIXELS - segStart;
             envDesc.insert(it, { seg.initialValue, fy, 0.0, lengthDelta });
 
             segmentIndex++;
@@ -199,7 +215,7 @@ void EnvelopeEditor::mouseDown(const MouseEvent& evt)
         else
         {
             // drag to adjust segment curvature
-            segmentIndex = getSegmentIndexFor(mx);
+            segmentIndex = getSegmentIndexFor(mx - INSET_PIXELS);
             if (segmentIndex >= 0)
             {
                 actionType = draggingSegmentBody;
@@ -209,16 +225,19 @@ void EnvelopeEditor::mouseDown(const MouseEvent& evt)
     }
 }
 
-#define MIN_CURVATURE -2.0f
-#define MAX_CURVATURE 2.0f
-
-//#define MIN_CURVATURE -50.0f
-//#define MAX_CURVATURE 50.0f
+#ifdef EXPONENTIAL_CURVES
+    #define MIN_CURVATURE -10.0f
+    #define MAX_CURVATURE 10.0f
+#else
+    #define MIN_CURVATURE -2.0f
+    #define MAX_CURVATURE 2.0f
+#endif
 
 void EnvelopeEditor::mouseDrag(const MouseEvent& evt)
 {
+    auto bounds = getLocalBounds().reduced(INSET_PIXELS);
     int mx = evt.getPosition().getX();
-    float fy = 1.0f - evt.getPosition().getY() / float(getHeight());
+    float fy = 1.0f - (evt.getPosition().getY() - INSET_PIXELS) / float(bounds.getHeight());
     if (fy < 0.0f) fy = 0.0f;
     if (fy > 1.0f) fy = 1.0f;
     float dy, curvature;
@@ -234,9 +253,9 @@ void EnvelopeEditor::mouseDrag(const MouseEvent& evt)
             envDesc[segmentIndex - 1].finalValue = fy;
             break;
         case draggingInteriorControlPoint:
-            if (mx >= prevSegStart && mx <= segEnd)
+            if ((mx - INSET_PIXELS) >= prevSegStart && (mx - INSET_PIXELS) <= segEnd)
             {
-                lengthDelta = mx - segStart;
+                lengthDelta = mx - INSET_PIXELS - segStart;
                 envDesc[segmentIndex].lengthSamples -= lengthDelta;
                 envDesc[segmentIndex - 1].lengthSamples += lengthDelta;
             }

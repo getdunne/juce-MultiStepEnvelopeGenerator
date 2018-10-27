@@ -1,4 +1,5 @@
 #include "SegmentGenerator.h"
+#include "Settings.h"
 
 void SegmentGenerator::reset(float initialValue, float finalValue, float curvature, int segmentLengthSamples)
 {
@@ -8,8 +9,11 @@ void SegmentGenerator::reset(float initialValue, float finalValue, float curvatu
     segLength = segmentLengthSamples;
 
     isLinear = (curvature == 0.0f);
-    //if (!isLinear) table.exponential(-curvature, curvature);
+#ifdef EXPONENTIAL_CURVES
+    if (!isLinear) table.exponentialCurve(-curvature, curvature);
+#else
     if (!isLinear) table.powerCurve(powf(2.0f, -curvature));
+#endif
 
     start();
 }

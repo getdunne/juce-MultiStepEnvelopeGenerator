@@ -1,6 +1,7 @@
 #pragma once
 #include "JuceHeader.h"
 #include "SegmentGenerator.h"
+#include "Settings.h"
 
 class EnvelopeEditor    : public Component
 {
@@ -32,7 +33,7 @@ protected:
 
     void paintGraph(Graphics&);
     int getSegmentIndexFor(int sampleIndex);
-    int getControlPointIndexFor(int mx, int my, int allowance=10);
+    int getControlPointIndexFor(int mx, int my, int allowance= DOT_RADIUS);
     void getSegmentStartAndEndIndices(int segIndex, int &segStart, int& segEnd, int& prevSegStart);
 
 private:
