@@ -378,11 +378,13 @@ void EnvelopeEditor::fillModulationBuffer(std::vector<float>& buffer)
     float fy;
     bool endOfEnvelope = false;
 
-    for (int ix = 0; !endOfEnvelope && ix < width; ix++)
+    for (int ix = 0; !endOfEnvelope && ix < width-1; ix++)
     {
         endOfEnvelope = env.getSample(fy);
         buffer[ix] = fy; // bipolar values by default.
     }
+
+    buffer[width - 1] = envDesc.at(envDesc.size() - 1).finalValue;
 }
 
 /*======================================================================================================================*/
