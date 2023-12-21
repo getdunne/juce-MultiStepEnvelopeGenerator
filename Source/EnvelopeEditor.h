@@ -6,7 +6,7 @@
 class EnvelopeEditor : public Component, private ChangeListener, public ChangeBroadcaster
 {
 public:
-    EnvelopeEditor();
+    EnvelopeEditor(); // todo.. you might want to pass in your colour/line style definitions etc.
     ~EnvelopeEditor();
 
     void paint (Graphics&) override;
@@ -29,6 +29,8 @@ public:
 private:
 
     void changeListenerCallback(ChangeBroadcaster* source) override;
+
+    void updatePaintingEnv();
 
     MultiSegmentEnvelopeGenerator env;
     MultiSegmentEnvelopeGenerator::Descriptor envDesc; // fixed pixels size envelope descriptor

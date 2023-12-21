@@ -79,36 +79,7 @@ void EnvelopeEditor::resized()
 {
     mouseEditModel.setBounds(getLocalBounds().reduced(INSET_PIXELS));
 
-    if (envDesc.size() == 0) return;
-
-    paintingEnv.clear();
-    paintingEnv = envDesc;
-
-    // resize all segments proportionally
-    auto bounds = getLocalBounds().reduced(INSET_PIXELS);
-
-    if (bounds.getWidth() > 0) // bounds has not yet been set.. so don't modify the data
-    {
-        int oldWidth = 0;
-
-        for (auto seg : paintingEnv)
-        {
-            oldWidth += seg.lengthSamples;
-        }
-
-        int newWidth = bounds.getWidth();
-        int totalWidth = 0;
-        for (int i = 0; i < (int(paintingEnv.size()) - 1); i++)
-        {
-            float proportion = float(paintingEnv[i].lengthSamples) / float(oldWidth);
-            int newLength = int(proportion * newWidth);
-            paintingEnv[i].lengthSamples = newLength;
-            totalWidth += newLength;
-        }
-        paintingEnv[paintingEnv.size() - 1].lengthSamples = newWidth - totalWidth;
-
-        repaint();
-    }
+    updatePaintingEnv();
 }
 
 /*======================================================================================================================*/
@@ -434,7 +405,43 @@ void EnvelopeEditor::changeListenerCallback(ChangeBroadcaster* source)
 {
     if (source == &mouseEditModel)
     {
-        resized();
+        updatePaintingEnv();
         sendChangeMessage(); // to let outside code know to re-read the model for other drawing updates based on it (e.g. to trigger call to 'fillModulationBuffer')
+    }
+}
+
+/*======================================================================================================================*/
+
+void EnvelopeEditor::updatePaintingEnv()
+{
+    if (envDesc.size() == 0) return;
+
+    paintingEnv.clear();
+    paintingEnv = envDesc;
+
+    // resize all segments proportionally
+    auto bounds = getLocalBounds().reduced(INSET_PIXELS);
+
+    if (bounds.getWidth() > 0) // bounds has not yet been set.. so don't modify the data
+    {
+        int oldWidth = 0;
+
+        for (auto seg : paintingEnv)
+        {
+            oldWidth += seg.lengthSamples;
+        }
+
+        int newWidth = bounds.getWidth();
+        int totalWidth = 0;
+        for (int i = 0; i < (int(paintingEnv.size()) - 1); i++)
+        {
+            float proportion = float(paintingEnv[i].lengthSamples) / float(oldWidth);
+            int newLength = int(proportion * newWidth);
+            paintingEnv[i].lengthSamples = newLength;
+            totalWidth += newLength;
+        }
+        paintingEnv[paintingEnv.size() - 1].lengthSamples = newWidth - totalWidth;
+
+        repaint();
     }
 }
