@@ -1,129 +1,220 @@
 #include "EnvelopeEditor.h"
 #include "Settings.h"
 
-EnvelopeEditor::EnvelopeEditor()
+EnvelopeEditor::EnvelopeEditor() : mouseEditModel(envDesc), env(MSEG_DEFAULT_PIXELS_WIDTH)
 {
-    backgroundColour = getLookAndFeel().findColour(ResizableWindow::backgroundColourId);
-    envDesc.push_back({ 0.0f, 1.0f, 0.0f, 600 });
+    mouseEditModel.addChangeListener(this);
+
+    if (envDesc.empty())
+        envDesc.push_back({ 0.5f, 0.5f, 0.0f,    MSEG_DEFAULT_PIXELS_WIDTH });
 }
 
 EnvelopeEditor::~EnvelopeEditor()
 {
 }
 
-void EnvelopeEditor::paintGraph(Graphics& g)
+/*======================================================================================================================*/
+
+void EnvelopeEditor::paint(Graphics& g)
 {
+    // this will be a child component of msegEditor with own background fill/lines.. so no need to fill background.
+    env.reset(&paintingEnv);
+
     auto bounds = getLocalBounds().reduced(INSET_PIXELS);
-    const float x0 = float(INSET_PIXELS);
-    const float y0 = float(INSET_PIXELS);
+    const float x0 = INSET_PIXELS;
+    const float y0 = INSET_PIXELS;
     int height = bounds.getHeight();
     int width = bounds.getWidth();
 
-    // paint the graph
-    g.setColour(Colours::white);
+
     Path p;
     float fx, fy;
     bool endOfEnvelope = env.getSample(fy);
     p.startNewSubPath(x0 + 0.0f, y0 + (1.0f - fy) * height);
-    for (int ix = 1; !endOfEnvelope && ix < width; ix++)
+    int ix = 1;
+    for (ix = 1; !endOfEnvelope && ix < width; ix++)
     {
         endOfEnvelope = env.getSample(fy);
         fx = float(ix);
         p.lineTo(x0 + fx, y0 + (1.0f - fy) * height);
     }
-    g.strokePath(p, PathStrokeType(2.0f));
+
+
+    g.setColour(Colours::grey);
 
     // put a circle at every segment start point
     Rectangle<float> dotRect(2 * DOT_RADIUS, 2 * DOT_RADIUS);
     int segStart = 0;
     int segEnd = 0;
     int si = 0;
-    for ( ; si < envDesc.size(); si++)
+    for (; si < paintingEnv.size(); si++)
     {
         fx = x0 + float(segStart);
-        fy = y0 + (1.0f - envDesc[si].initialValue) * height;
-        g.setColour(backgroundColour);
-        g.fillEllipse(dotRect.withCentre(Point<float>(fx, fy)));
-        g.setColour(Colours::white);
+        fy = y0 + (1.0f - paintingEnv[si].initialValue) * height;
+
         g.drawEllipse(dotRect.withCentre(Point<float>(fx, fy)), 2.0f);
 
-        int segLength = envDesc[si].lengthSamples;
+        int segLength = paintingEnv[si].lengthSamples;
         segEnd = segStart + segLength;
         segStart += segLength;
     }
 
     // put a circle at the last segment end point
     fx = x0 + float(segEnd);
-    fy = y0 + (1.0f - envDesc[si-1].finalValue) * bounds.getHeight();
-    g.setColour(backgroundColour);
-    g.fillEllipse(dotRect.withCentre(Point<float>(fx, fy)));
-    g.setColour(Colours::white);
+    fy = y0 + (1.0f - paintingEnv[si - 1].finalValue) * bounds.getHeight();
+
     g.drawEllipse(dotRect.withCentre(Point<float>(fx, fy)), 2.0f);
+
+
+    p.lineTo(fx, fy); // the very last line section 
+
+    // paint the graph
+    g.setColour(juce::Colours::white);
+    g.strokePath(p, PathStrokeType(2.0f));
 }
 
-void EnvelopeEditor::paint (Graphics& g)
-{
-    g.fillAll(backgroundColour);
-    env.reset(&envDesc);
-    paintGraph(g);
-}
+/*======================================================================================================================*/
 
 void EnvelopeEditor::resized()
 {
+    mouseEditModel.setBounds(getLocalBounds().reduced(INSET_PIXELS));
+
     if (envDesc.size() == 0) return;
+
+    paintingEnv.clear();
+    paintingEnv = envDesc;
 
     // resize all segments proportionally
     auto bounds = getLocalBounds().reduced(INSET_PIXELS);
 
-    int oldWidth = 0;
-    for (auto& seg : envDesc) oldWidth += seg.lengthSamples;
-
-    int newWidth = bounds.getWidth();
-    int totalWidth = 0;
-    for (int i=0; i < (int(envDesc.size()) - 1); i++)
+    if (bounds.getWidth() > 0) // bounds has not yet been set.. so don't modify the data
     {
-        float proportion = float(envDesc[i].lengthSamples) / float(oldWidth);
-        int newLength = int(proportion * newWidth);
-        envDesc[i].lengthSamples = newLength;
-        totalWidth += newLength;
+        int oldWidth = 0;
+
+        for (auto seg : paintingEnv)
+        {
+            oldWidth += seg.lengthSamples;
+        }
+
+        int newWidth = bounds.getWidth();
+        int totalWidth = 0;
+        for (int i = 0; i < (int(paintingEnv.size()) - 1); i++)
+        {
+            float proportion = float(paintingEnv[i].lengthSamples) / float(oldWidth);
+            int newLength = int(proportion * newWidth);
+            paintingEnv[i].lengthSamples = newLength;
+            totalWidth += newLength;
+        }
+        paintingEnv[paintingEnv.size() - 1].lengthSamples = newWidth - totalWidth;
+
+        repaint();
     }
-    envDesc[envDesc.size() - 1].lengthSamples = newWidth - totalWidth;
 }
 
-int EnvelopeEditor::getSegmentIndexFor(int sampleIndex)
+/*======================================================================================================================*/
+
+void EnvelopeEditor::flipH()
+{
+    if (envDesc.size() == 0) return;
+
+    envDescCopy.clear();
+    envDescCopy = envDesc;
+
+    int envDescSize = envDesc.size();
+
+    for (int i = 0; i < envDescSize; i++)
+    {
+        float oldYinitial = envDescCopy[(envDescSize - 1 - i)].initialValue;
+        float oldYfinal = envDescCopy[(envDescSize - 1 - i)].finalValue;
+        float oldCurve = envDescCopy[(envDescSize - 1 - i)].curvature;
+        int oldLengthSamples = envDescCopy[(envDescSize - 1 - i)].lengthSamples;
+
+        envDesc.at(i).initialValue = oldYfinal;
+        envDesc.at(i).finalValue = oldYinitial;
+        envDesc.at(i).curvature = oldCurve * -1.0f;
+        envDesc.at(i).lengthSamples = oldLengthSamples;
+    }
+
+    sendChangeMessage(); // to let external code to know when to re-read the data from MSEG
+    resized();
+}
+
+/*======================================================================================================================*/
+
+void EnvelopeEditor::flipV()
+{
+    if (envDesc.size() == 0) return;
+
+    for (int i = 0; i < (int(envDesc.size())); i++)
+    {
+        float oldYinitial = envDesc.at(i).initialValue;
+        float oldYfinal = envDesc.at(i).finalValue;
+
+        envDesc.at(i).initialValue = (-1.0f * (oldYinitial - 0.5)) + 0.5f;
+        envDesc.at(i).finalValue = (-1.0f * (oldYfinal - 0.5)) + 0.5f;
+        envDesc.at(i).curvature = envDesc.at(i).curvature;
+    }
+
+    sendChangeMessage(); // to let external code to know when to re-read the data from MSEG
+    resized();
+
+}
+
+/*======================================================================================================================*/
+
+void EnvelopeEditor::clearSegments()
+{
+    envDesc.clear();
+    envDesc.push_back({ 0.5f, 0.5f, 0.0f,  MSEG_DEFAULT_PIXELS_WIDTH });
+
+    resized();
+    sendChangeMessage(); // to let external code to know when to re-read the data from MSEG
+}
+
+
+/*======================================================================================================================*/
+
+int EnvelopeEditor::MouseEditModel::getSegmentIndexFor(int sampleIndex)
 {
     int segStart = 0;
     for (int i = 0; i < envDesc.size(); i++)
     {
-        int segLength = envDesc[i].lengthSamples;
+        int segLength = envDesc.at(i).lengthSamples;
         int segEnd = segStart + segLength;
-        if (sampleIndex >= segStart && sampleIndex <= segEnd) return i;
+        if (sampleIndex >= segStart && sampleIndex <= segEnd)
+        {
+            return i;
+        }
         segStart += segLength;
     }
     return -1;  // not found
 }
 
-int EnvelopeEditor::getControlPointIndexFor(int mx, int my, int allowance)
+/*======================================================================================================================*/
+
+int EnvelopeEditor::MouseEditModel::getControlPointIndexFor(int mx, int my, int xAllowance, int yAllowance)
 {
-    auto bounds = getLocalBounds().reduced(INSET_PIXELS);
-    mx -= INSET_PIXELS;
-    my -= INSET_PIXELS;
+    juce::Rectangle<int> bounds = juce::Rectangle<int>{ 0,0,  MSEG_DEFAULT_PIXELS_WIDTH, MSEG_DEFAULT_PIXELS_HEIGHT };
 
     int segStart = 0;
     for (int i = 0; i < envDesc.size(); i++)
     {
-        int segLength = envDesc[i].lengthSamples;
+        int segLength = envDesc.at(i).lengthSamples;
         int segEnd = segStart + segLength;
         //if ((mx < 0 || mx >= segStart) && (mx - segStart) < allowance)
-        if (abs(mx - segStart) < allowance)
+        if (abs(mx - segStart) < xAllowance)
         {
-            if (abs(my - (1.0f - envDesc[i].initialValue) * bounds.getHeight()) < allowance)
+            int yAbs = abs(my - ((1.0f - envDesc.at(i).initialValue) * MSEG_DEFAULT_PIXELS_HEIGHT));
+
+            if (yAbs < yAllowance)
                 return i;
         }
         //if ((segEnd - mx) < allowance)
-        if (abs(mx - segEnd) < allowance)
+        if (abs(mx - segEnd) < xAllowance)
         {
-            if (abs(my - (1.0f - envDesc[i].finalValue) * bounds.getHeight()) < allowance)
+            int yAbs = abs(my - ((1.0f - envDesc.at(i).finalValue) * MSEG_DEFAULT_PIXELS_HEIGHT));
+
+            if (yAbs < yAllowance)
                 return i + 1;
         }
         segStart += segLength;
@@ -131,13 +222,15 @@ int EnvelopeEditor::getControlPointIndexFor(int mx, int my, int allowance)
     return -1;  // not found
 }
 
-void EnvelopeEditor::getSegmentStartAndEndIndices(int segIndex, int &segStart, int&segEnd, int& prevSegStart)
+/*======================================================================================================================*/
+
+void EnvelopeEditor::MouseEditModel::getSegmentStartAndEndIndices(int segIndex, int& segStart, int& segEnd, int& prevSegStart)
 {
     segStart = 0;
     prevSegStart = 0;
     for (int i = 0; i < envDesc.size(); i++)
     {
-        int segLength = envDesc[i].lengthSamples;
+        int segLength = envDesc.at(i).lengthSamples;
         segEnd = segStart + segLength;
         if (i == segIndex) return;
         prevSegStart = segStart;
@@ -146,15 +239,29 @@ void EnvelopeEditor::getSegmentStartAndEndIndices(int segIndex, int &segStart, i
     prevSegStart = segStart = segEnd = 0;
 }
 
-void EnvelopeEditor::mouseDown(const MouseEvent& evt)
+/*======================================================================================================================*/
+
+void EnvelopeEditor::MouseEditModel::mouseDown(float mx, float my, int numberofclicks)
 {
-    auto bounds = getLocalBounds().reduced(INSET_PIXELS);
-    int mx = evt.getPosition().getX();
-    int my = evt.getPosition().getY();
-    float fy = 1.0f - (my - INSET_PIXELS) / float(bounds.getHeight());
+    // convert mouse down X and Y to the virtual fixed buffer size we use for storing data/modulating 
+    // this prevents rescaling error build ups by not needing to resize the data that describes the MSEG... MVC...
+
+    juce::Rectangle<int> descriptorBounds = juce::Rectangle<int>{ 0,0,  MSEG_DEFAULT_PIXELS_WIDTH, MSEG_DEFAULT_PIXELS_HEIGHT };
+
+    int screenBoundsWidth = screenBounds.getWidth();
+    int screenBoundsHeight = screenBounds.getHeight();
+
+    float mouseXscale = (float)descriptorBounds.getWidth() / (float)screenBoundsWidth;
+    float mouseYscale = (float)descriptorBounds.getHeight() / (float)screenBoundsHeight;
+
+    mx = mx * mouseXscale;
+    my = my * mouseYscale;
+
+    float fy = 1.0f - (float)(my / (float)descriptorBounds.getHeight());
+
     actionType = none;
 
-    segmentIndex = getControlPointIndexFor(mx, my);
+    segmentIndex = getControlPointIndexFor(mx, my, (2 * DOT_RADIUS * mouseXscale), (2 * DOT_RADIUS * mouseYscale));
     if (segmentIndex == 0)
     {
         // hit leftmost control point
@@ -168,20 +275,20 @@ void EnvelopeEditor::mouseDown(const MouseEvent& evt)
     else if (segmentIndex > 0)
     {
         // hit an interior control point
-        if (evt.getNumberOfClicks() > 1)
+        if (numberofclicks > 1)
         {
             // delete control point
             auto it = envDesc.begin();
             for (int i = 0; i < segmentIndex; i++) it++;
 
-            auto seg = envDesc[segmentIndex];
+            auto seg = envDesc.at(segmentIndex);
             envDesc.erase(it);
             segmentIndex--;
 
-            envDesc[segmentIndex].finalValue = seg.finalValue;
-            envDesc[segmentIndex].lengthSamples += seg.lengthSamples;
+            envDesc.at(segmentIndex).finalValue = seg.finalValue;
+            envDesc.at(segmentIndex).lengthSamples += seg.lengthSamples;
 
-            repaint();
+            sendChangeMessage();
         }
         else
         {
@@ -189,55 +296,65 @@ void EnvelopeEditor::mouseDown(const MouseEvent& evt)
             actionType = draggingInteriorControlPoint;
         }
     }
-
     else
     {
         // didn't hit any control points
-        if (evt.getNumberOfClicks() > 1)
+        if (numberofclicks > 1)
         {
             // insert new control point
-            segmentIndex = getSegmentIndexFor(mx - INSET_PIXELS);
+            segmentIndex = getSegmentIndexFor(mx);
             auto it = envDesc.begin();
             for (int i = 0; i < segmentIndex; i++) it++;
 
             auto seg = *it;
             int segStart, segEnd, prevSegStart;
             getSegmentStartAndEndIndices(segmentIndex, segStart, segEnd, prevSegStart);
-            int lengthDelta = mx - INSET_PIXELS - segStart;
+            int lengthDelta = mx - segStart;
             envDesc.insert(it, { seg.initialValue, fy, 0.0, lengthDelta });
 
             segmentIndex++;
-            envDesc[segmentIndex].initialValue = fy;
-            envDesc[segmentIndex].lengthSamples -= lengthDelta;
+            envDesc.at(segmentIndex).initialValue = fy;
+            envDesc.at(segmentIndex).lengthSamples -= lengthDelta;
 
-            repaint();
+            sendChangeMessage();
         }
         else
         {
             // drag to adjust segment curvature
-            segmentIndex = getSegmentIndexFor(mx - INSET_PIXELS);
+            segmentIndex = getSegmentIndexFor(mx);
             if (segmentIndex >= 0)
             {
                 actionType = draggingSegmentBody;
-                savedCurvature = envDesc[segmentIndex].curvature;
+                savedCurvature = envDesc.at(segmentIndex).curvature;
             }
         }
     }
 }
 
-#ifdef EXPONENTIAL_CURVES
-    #define MIN_CURVATURE -10.0f
-    #define MAX_CURVATURE 10.0f
-#else
-    #define MIN_CURVATURE -2.0f
-    #define MAX_CURVATURE 2.0f
-#endif
+/*======================================================================================================================*/
 
-void EnvelopeEditor::mouseDrag(const MouseEvent& evt)
+void EnvelopeEditor::MouseEditModel::mouseDrag(float mx, float my, int dragYdistance)
 {
-    auto bounds = getLocalBounds().reduced(INSET_PIXELS);
-    int mx = evt.getPosition().getX();
-    float fy = 1.0f - (evt.getPosition().getY() - INSET_PIXELS) / float(bounds.getHeight());
+    // convert mouse down X and Y to the virtual fixed buffer size we use for storing data/modulating - this prevents rescaling error build ups by not needing to 
+    // resize the data that describes the MSEG... MVC...
+
+    juce::Rectangle<int> descriptorBounds = juce::Rectangle<int>{ 0,0,  MSEG_DEFAULT_PIXELS_WIDTH, MSEG_DEFAULT_PIXELS_HEIGHT };
+
+
+    int screenBoundsWidth = screenBounds.getWidth();
+    int screenBoundsHeight = screenBounds.getHeight();
+
+    float mouseXscale = (float)descriptorBounds.getWidth() / (float)screenBoundsWidth;
+    float mouseYscale = (float)descriptorBounds.getHeight() / (float)screenBoundsHeight;
+
+
+    mx = mx * mouseXscale;
+    my = my * mouseYscale;
+
+
+    float fy = 1.0f - (float)(my / (float)descriptorBounds.getHeight());
+
+
     if (fy < 0.0f) fy = 0.0f;
     if (fy > 1.0f) fy = 1.0f;
     float dy, curvature;
@@ -246,32 +363,78 @@ void EnvelopeEditor::mouseDrag(const MouseEvent& evt)
 
     switch (actionType)
     {
-        case draggingLeftmostControlPoint:
-            envDesc[segmentIndex].initialValue = fy;
-            break;
-        case draggingRightmostControlPoint:
-            envDesc[segmentIndex - 1].finalValue = fy;
-            break;
-        case draggingInteriorControlPoint:
-            if ((mx - INSET_PIXELS) >= prevSegStart && (mx - INSET_PIXELS) <= segEnd)
-            {
-                lengthDelta = mx - INSET_PIXELS - segStart;
-                envDesc[segmentIndex].lengthSamples -= lengthDelta;
-                envDesc[segmentIndex - 1].lengthSamples += lengthDelta;
-            }
-            envDesc[segmentIndex].initialValue = fy;
-            envDesc[segmentIndex - 1].finalValue = fy;
-            break;
-        case draggingSegmentBody:
-            dy = 0.02f * evt.getDistanceFromDragStartY();
-            if (envDesc[segmentIndex].finalValue < envDesc[segmentIndex].initialValue) dy = -dy;
-            curvature = savedCurvature - dy * dy*dy;
-            if (curvature > MAX_CURVATURE) curvature = MAX_CURVATURE;
-            if (curvature < MIN_CURVATURE) curvature = MIN_CURVATURE;
-            envDesc[segmentIndex].curvature = curvature;
-            break;
-        default:
-            return;
+    case draggingLeftmostControlPoint:
+        envDesc.at(segmentIndex).initialValue = fy;
+        break;
+    case draggingRightmostControlPoint:
+        envDesc.at(segmentIndex - 1).finalValue = fy;
+        break;
+    case draggingInteriorControlPoint:
+        if ((mx) >= prevSegStart && (mx) <= segEnd)
+        {
+            lengthDelta = mx - segStart;
+            envDesc.at(segmentIndex).lengthSamples -= lengthDelta;
+            envDesc.at(segmentIndex - 1).lengthSamples += lengthDelta;
+        }
+        envDesc.at(segmentIndex).initialValue = fy;
+        envDesc.at(segmentIndex - 1).finalValue = fy;
+        break;
+    case draggingSegmentBody:
+        dy = 0.02f * dragYdistance;
+        if (envDesc.at(segmentIndex).finalValue < envDesc.at(segmentIndex).initialValue) dy = -dy;
+        curvature = savedCurvature - dy * dy * dy;
+        if (curvature > MAX_CURVATURE) curvature = MAX_CURVATURE;
+        if (curvature < MIN_CURVATURE) curvature = MIN_CURVATURE;
+        envDesc.at(segmentIndex).curvature = curvature;
+        break;
+    default:
+        return;
     }
-    repaint();
+    sendChangeMessage();
+}
+
+/*======================================================================================================================*/
+
+void EnvelopeEditor::fillModulationBuffer(std::vector<float>& buffer)
+{
+    // the pixel resolution of the edit envelope and the saved/modulation data buffer will be the same.. we only re-scale for drawing the output.
+
+    jassert(buffer.size() == MSEG_DEFAULT_PIXELS_WIDTH);
+
+    int width = buffer.size();
+
+    env.reset(&envDesc, 0);
+    float fy;
+    bool endOfEnvelope = false;
+
+    for (int ix = 0; !endOfEnvelope && ix < width; ix++)
+    {
+        endOfEnvelope = env.getSample(fy);
+        buffer[ix] = fy; // bipolar values by default.
+    }
+}
+
+/*======================================================================================================================*/
+
+void EnvelopeEditor::mouseDown(const MouseEvent& event)
+{
+    mouseEditModel.mouseDown(event.x - INSET_PIXELS, event.y - INSET_PIXELS, event.getNumberOfClicks());
+}
+
+/*======================================================================================================================*/
+
+void EnvelopeEditor::mouseDrag(const MouseEvent& event)
+{
+    mouseEditModel.mouseDrag(event.x - INSET_PIXELS, event.y - INSET_PIXELS, event.getDistanceFromDragStartY());
+}
+
+/*======================================================================================================================*/
+
+void EnvelopeEditor::changeListenerCallback(ChangeBroadcaster* source)
+{
+    if (source == &mouseEditModel)
+    {
+        resized();
+        sendChangeMessage(); // to let outside code know to re-read the model for other drawing updates based on it (e.g. to trigger call to 'fillModulationBuffer')
+    }
 }

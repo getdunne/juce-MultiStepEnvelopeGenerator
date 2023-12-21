@@ -1,16 +1,14 @@
 #pragma once
 
-#define DEFAULT_TABLE_SIZE 256
-
 struct FunctionTable
 {
     float *pWaveTable;
     int nTableSize;
         
-    FunctionTable() : pWaveTable(0), nTableSize(0) {}
+    FunctionTable(int tableSize) : pWaveTable(0), nTableSize(0) { init(tableSize); }
     ~FunctionTable() { deinit(); }
         
-    void init(int tableLength=DEFAULT_TABLE_SIZE);
+    void init(int tableLength);
     void deinit();
         
     void exponentialCurve(float left, float right);
