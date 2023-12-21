@@ -26,7 +26,7 @@ void FunctionTable::deinit()
 void FunctionTable::exponentialCurve(float left, float right)
 {
     // in case user forgot, init table to default size
-    if (pWaveTable == 0) init();
+    if (pWaveTable == 0) init(nTableSize);
         
     float bottom = -expf(-left);
     float top = -expf(-right);
@@ -43,8 +43,7 @@ void FunctionTable::exponentialCurve(float left, float right)
 // Typical range of the exponent is plus or minus 4 to 5.
 void FunctionTable::powerCurve(float exponent)
 {
-    // in case user forgot, init table to default size
-    if (pWaveTable == 0) init();
+    if (pWaveTable == 0) init(nTableSize);
 
     float x = 0.0f;
     float dx = 1.0f / (nTableSize - 1);

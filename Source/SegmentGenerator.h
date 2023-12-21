@@ -4,7 +4,14 @@
 
 class SegmentGenerator
 {
+
+
 public:
+
+    SegmentGenerator(int tableSize_) : table(tableSize_)
+    {}
+    ~SegmentGenerator(){}
+
     void reset(float initialValue, float finalValue, float curvature, int segmentLengthSamples);
 
     void start();
@@ -30,6 +37,8 @@ public:
         return (++tcount >= segLength);
     }
 
+
+
 protected:
     float firstValue, lastValue;
     bool isHorizontal, isLinear;
@@ -42,6 +51,12 @@ protected:
 class MultiSegmentEnvelopeGenerator : public SegmentGenerator
 {
 public:
+
+    MultiSegmentEnvelopeGenerator(int tableSize_) : SegmentGenerator(tableSize_) {}
+
+    ~MultiSegmentEnvelopeGenerator() {}
+
+
     struct SegmentDescriptor
     {
         float initialValue;
